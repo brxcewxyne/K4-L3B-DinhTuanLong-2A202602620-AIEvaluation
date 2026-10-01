@@ -292,28 +292,34 @@ và TruLens; chạy hoặc thiết kế một so sánh có cùng input dataset.
 Mục tiêu: kiểm tra việc đổi thứ tự chunks có tăng Context Precision mà không
 thay đổi Context Recall hay không.
 
-1. Chọn ít nhất 5 cases từ `artifacts/actual_answers.json`.
-2. Tính Context Recall và Context Precision trước rerank.
-3. Implement `rerank_by_overlap()` hoặc một reranker khác.
-4. Rerank cùng tập chunks, không thêm hoặc xóa chunk.
-5. Tính lại hai metrics và giải thích kết quả.
+> Thiết kế thí nghiệm (số liệu thật từ `artifacts/bonus_reranking_results.json`, code trong `bonus_reranking.py`):
+> 1. **Mục tiêu và giả thuyết:** rerank lexical theo question sẽ đưa chunk liên quan lên đầu, tăng Context Precision trung bình mà không đổi Context Recall (vì hợp các chunk không đổi).
+> 2. **Cases được chọn và vì sao:** 6 cases E01, M01, M04, M06, H04, A03 — phủ Easy/Medium/Hard/Adversarial và các failure patterns (passed, off_topic, hallucination, irrelevant); gồm M06 và A03 theo gợi ý. Quy tắc eligibility không dựa trên điểm số: cần đủ 5 chunks để có ý nghĩa reorder (A01 chỉ có 2 chunks nên loại). Không cherry-pick theo kết quả vì thứ tự chọn được chốt trước khi chạy.
+> 3. **Baseline BM25:** đúng thứ tự `retrieved_contexts` trong `artifacts/actual_answers.json` (top_k=5 của `BM25Retriever`).
+> 4. **Kỹ thuật rerank:** IDF-weighted question-term overlap trên đúng tập candidate của từng case: `score = Σ idf(t)` trên các question-term chung, với `idf(t) = ln((N+1)/(df(t)+1)) + 1` tính trong N=5 chunks; hòa điểm giữ nguyên thứ tự BM25 (stable sort, không mang tín hiệu relevance). Khác BM25 ở: không TF-saturation, không length-norm, TF nhị phân, IDF tính trên tập candidate thay vì corpus. Hạn chế: thuần lexical (không stemming/synonym), IDF trên N=5 thiếu ổn định, không cứu được evidence vắng mặt.
+> 5. **Fairness:** cùng chunk IDs trước/sau (đã assert `sorted(ids)` bằng nhau cho cả 6 cases); không thêm/xóa/sửa chunk, không retrieval lần hai; reranker chỉ nhận question + text chunks, gold expected chỉ dùng khi đo metric bằng `template.RAGASEvaluator`.
+> 6. **Protocol:** đo Recall/Precision trước → rerank → đo lại bằng cùng định nghĩa metric; chạy lại 2 lần cho cùng kết quả (deterministic). Không regenerate answers nên không claim Faithfulness/Relevance/Completeness/pass rate thay đổi.
 
 | ID | Recall before | Recall after | Precision before | Precision after | Delta Precision |
 |---|---:|---:|---:|---:|---:|
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| **Avg** | | | | | |
+| E01 | 0.958 | 0.958 | 0.833 | 1.000 | +0.167 |
+| M01 | 1.000 | 1.000 | 0.806 | 0.700 | -0.106 |
+| M04 | 0.679 | 0.679 | 0.917 | 0.700 | -0.217 |
+| M06 | 0.667 | 0.667 | 0.804 | 0.804 | +0.000 |
+| H04 | 1.000 | 1.000 | 0.887 | 0.950 | +0.062 |
+| A03 | 0.843 | 0.843 | 1.000 | 1.000 | +0.000 |
+| **Avg** | 0.858 | 0.858 | 0.875 | 0.859 | -0.016 |
+
+> Đọc kết quả: cải thiện E01 (+0.167, đẩy chunk noise OT-06-P02 xuống cuối) và H04 (+0.062, đảo 2 chunk `02` đầu bảng); giữ nguyên M06 và A03 (A03 gold chunk đã đứng đầu từ baseline; M06 tuy đảo OT-07-P02 xuống cuối nhưng pattern relevance đối xứng nên AP không đổi); **giảm** M01 (-0.106) và M04 (-0.217). Trung bình Precision 0.875 → 0.859 (delta -0.016): **giả thuyết tăng trung bình KHÔNG được ủng hộ** trên 6 cases này. Giải thích từ trace: reranker tối ưu overlap với QUESTION trong khi Precision đo relevance với EXPECTED — hai thứ tự này không trùng nhau (ví dụ M04: chunk shipping/scope khớp nhiều từ question nên trồi lên, đẩy chunk expected-relevant xuống). Đây là kết quả quan sát, không phải tuning theo điểm: phương pháp và tập cases đã chốt trước khi đo.
+> Hạn chế và trade-off: lexical rerank theo question có thể win ở case hỏi-trùng-từ-với-evidence (E01) nhưng thua ở case question và expected dùng từ vựng khác nhau (M01/M04); N=5 khiến IDF nhạy; mọi delta đều nằm trong candidate set cố định nên Recall bằng nhau ở mọi case (xác nhận bên dưới).
 
 **Tại sao Recall dự kiến không đổi?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Context Recall đo trên **hợp (union)** token của toàn bộ candidate chunks so với expected. Rerank chỉ đổi thứ tự, không thêm/xóa chunk nên union không đổi → Recall trước/sau bằng nhau ở cả 6 cases (0.958/1.000/0.679/0.667/1.000/0.843 giữ nguyên, mean 0.858 → 0.858). Điều này cũng chứng tỏ reranker không hề làm mất hay thêm evidence.
 
 **Khi nào reranking không đủ và cần sửa retriever/query/chunking?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Khi gold evidence **vắng mặt** trong candidate set (ví dụ đoạn OT-08-P02 của M06 không lọt top-5): mọi phép reorder đều vô ích vì không có gì đúng để đưa lên đầu — lúc đó phải sửa retriever (query expansion, synonym, intent-boost), chunking (chunk theo điều kiện chính sách thay vì đoạn văn thuần túy) hoặc tăng top_k rồi mới rerank. Rerank chỉ là bước sắp xếp lại, không phải bước tìm thêm evidence.*
 
 ---
 

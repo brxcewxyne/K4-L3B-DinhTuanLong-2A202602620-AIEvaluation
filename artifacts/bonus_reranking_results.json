@@ -1,0 +1,157 @@
+{
+  "experiment": "bonus-3.5-idf-rerank-v1",
+  "method": "candidate-set IDF-weighted question-term overlap; score = sum idf(t) over shared question terms; stable ties",
+  "reranker_inputs": "question + candidate chunk texts only (no gold)",
+  "metric": "template.RAGASEvaluator.evaluate_context_precision/recall",
+  "cases": [
+    {
+      "id": "E01",
+      "question": "What are the ports, memory, and storage of the NovaBook 14, and what charger does it use?",
+      "baseline_chunk_ids": [
+        "OT-01-P01",
+        "OT-06-P02",
+        "OT-06-P01",
+        "OT-01-P05",
+        "OT-06-P03"
+      ],
+      "reranked_chunk_ids": [
+        "OT-01-P01",
+        "OT-06-P01",
+        "OT-01-P05",
+        "OT-06-P03",
+        "OT-06-P02"
+      ],
+      "candidate_set_identical": true,
+      "recall_before": 0.9583333333333334,
+      "recall_after": 0.9583333333333334,
+      "precision_before": 0.8333333333333333,
+      "precision_after": 1.0,
+      "delta_precision": 0.16666666666666674
+    },
+    {
+      "id": "M01",
+      "question": "I want to buy a USD 400 device with OrbitPay instalments and use a gift card for the first payment. How does the plan work?",
+      "baseline_chunk_ids": [
+        "OT-02-P04",
+        "OT-07-P04",
+        "OT-04-P02",
+        "OT-03-P01",
+        "OT-02-P02"
+      ],
+      "reranked_chunk_ids": [
+        "OT-02-P04",
+        "OT-02-P02",
+        "OT-07-P04",
+        "OT-04-P02",
+        "OT-03-P01"
+      ],
+      "candidate_set_identical": true,
+      "recall_before": 1.0,
+      "recall_after": 1.0,
+      "precision_before": 0.8055555555555555,
+      "precision_after": 0.7000000000000001,
+      "delta_precision": -0.1055555555555554
+    },
+    {
+      "id": "M04",
+      "question": "Can I return opened ear tips, and what must I provide when returning a device?",
+      "baseline_chunk_ids": [
+        "OT-05-P02",
+        "OT-01-P03",
+        "OT-00-P05",
+        "OT-09-P04",
+        "OT-04-P04"
+      ],
+      "reranked_chunk_ids": [
+        "OT-05-P02",
+        "OT-04-P04",
+        "OT-00-P05",
+        "OT-01-P03",
+        "OT-09-P04"
+      ],
+      "candidate_set_identical": true,
+      "recall_before": 0.6785714285714286,
+      "recall_after": 0.6785714285714286,
+      "precision_before": 0.9166666666666666,
+      "precision_after": 0.7000000000000001,
+      "delta_precision": -0.21666666666666656
+    },
+    {
+      "id": "M06",
+      "question": "I think someone accessed my OrbitTech account without permission. What should I do?",
+      "baseline_chunk_ids": [
+        "OT-09-P02",
+        "OT-06-P02",
+        "OT-07-P02",
+        "OT-08-P03",
+        "OT-08-P01"
+      ],
+      "reranked_chunk_ids": [
+        "OT-09-P02",
+        "OT-06-P02",
+        "OT-08-P03",
+        "OT-08-P01",
+        "OT-07-P02"
+      ],
+      "candidate_set_identical": true,
+      "recall_before": 0.6666666666666666,
+      "recall_after": 0.6666666666666666,
+      "precision_before": 0.8041666666666667,
+      "precision_after": 0.8041666666666667,
+      "delta_precision": 0.0
+    },
+    {
+      "id": "H04",
+      "question": "My order status is Packing and I want to cancel it and have it sent to a different country instead. What are my options?",
+      "baseline_chunk_ids": [
+        "OT-02-P03",
+        "OT-02-P05",
+        "OT-01-P05",
+        "OT-03-P02",
+        "OT-00-P02"
+      ],
+      "reranked_chunk_ids": [
+        "OT-02-P05",
+        "OT-02-P03",
+        "OT-00-P02",
+        "OT-01-P05",
+        "OT-03-P02"
+      ],
+      "candidate_set_identical": true,
+      "recall_before": 1.0,
+      "recall_after": 1.0,
+      "precision_before": 0.8875,
+      "precision_after": 0.95,
+      "delta_precision": 0.0625
+    },
+    {
+      "id": "A03",
+      "question": "What is the live status of my order right now, and on exactly which day will the carrier deliver it?",
+      "baseline_chunk_ids": [
+        "OT-00-P02",
+        "OT-02-P03",
+        "OT-04-P03",
+        "OT-09-P04",
+        "OT-03-P05"
+      ],
+      "reranked_chunk_ids": [
+        "OT-00-P02",
+        "OT-02-P03",
+        "OT-04-P03",
+        "OT-09-P04",
+        "OT-03-P05"
+      ],
+      "candidate_set_identical": true,
+      "recall_before": 0.8431372549019608,
+      "recall_after": 0.8431372549019608,
+      "precision_before": 1.0,
+      "precision_after": 1.0,
+      "delta_precision": 0.0
+    }
+  ],
+  "mean_recall_before": 0.8577847805788982,
+  "mean_recall_after": 0.8577847805788982,
+  "mean_precision_before": 0.874537037037037,
+  "mean_precision_after": 0.8590277777777778,
+  "mean_delta_precision": -0.015509259259259204
+}
