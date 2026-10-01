@@ -30,11 +30,11 @@ critical.
 
 | Metric | Acceptable Low Score Scenario | Critical Low Score Scenario | Action Required |
 |---|---|---|---|
-| Faithfulness | | | |
-| Answer Relevance | | | |
-| Context Recall | | | |
-| Context Precision | | | |
-| Completeness | | | |
+| Faithfulness | Score ~0.6–0.8: câu trả lời đúng chính sách đổi trả (unopened 30 ngày) nhưng diễn đạt lại và thêm chi tiết phụ vô hại, ví dụ "vui lòng giữ lại hộp gốc" dù corpus không ghi rõ. Không gây thiệt hại tài chính. | Score < 0.6 (đặc biệt < 0.3): bịa chính sách có hậu quả, ví dụ khẳng định "AeroBuds Pro được bảo hành 24 tháng" trong khi corpus quy định 12 tháng, hoặc "máy đã mở hộp vẫn được trả trong 30 ngày và miễn 10% restocking fee". | Thêm faithfulness guardrail: bắt buộc citation/quote evidence cho mỗi claim về thời hạn, phí, điều kiện; reject hoặc gắn cờ câu trả lời có claim không grounded trước khi gửi cho khách. |
+| Answer Relevance | Score ~0.6–0.8: trả lời đúng ý hỏi về đổi trả NovaBook 14 nhưng lan man thêm 1–2 câu giới thiệu PulsePhone X không được hỏi. Khách vẫn giải quyết được việc. | Score < 0.6 (đặc biệt < 0.3): lạc intent, ví dụ khách hỏi "mở hộp bị tính phí restocking bao nhiêu?" nhưng bot trả lời về quyền lợi OrbitPlus membership. Khách phải hỏi lại. | Cải thiện prompt clarity và intent detection: làm rõ system prompt OrbitTech, thêm few-shot cho câu hỏi đa nghĩa (return vs warranty vs repair), giới hạn độ dài phần mở rộng. |
+| Context Recall | Score ~0.6–0.8: retriever lấy được evidence cốt lõi (window 30/14 ngày) nhưng thiếu 1 chunk phụ như "refund về phương thức gốc trong 5–7 business days". Answer vẫn đúng phần chính. | Score < 0.6: bỏ sót evidence quyết định, ví dụ không retrieve đoạn "opened device 14 ngày + 10% restocking fee" nên bot trả lời sai window/miễn phí. Lỗi thuộc retrieval. | Tăng coverage: tăng top-k, cải thiện chunking theo điều kiện chính sách, bổ sung synonym (return/refund/exchange), rewrite query cho câu hỏi có điều kiện mở hộp/khiếm khuyết. |
+| Context Precision | Score ~0.6–0.8: chunk đúng nằm ở top-1/top-2 nhưng kèm 1–2 chunk noise, ví dụ hỏi warranty 24 tháng của NovaBook 14 nhưng kèm thêm chunk shipping. Generator vẫn dùng đúng evidence. | Score < 0.6: top-K toàn noise (ví dụ hỏi warranty nhưng top chunks đều về promotions), chunk liên quan bị đẩy xuống cuối nên generator trả lời dựa trên context sai. | Áp dụng reranking (lexical rerank hoặc cross-encoder), lọc chunk dưới relevance_threshold, cải thiện BM25/query rewriting để chunk liên quan lên đầu. |
+| Completeness | Score ~0.6–0.8: thiếu chi tiết nhỏ không đổi quyết định, ví dụ nêu đúng window 30 ngày cho unopened nhưng quên "phần gift-card được hoàn vào gift card thay thế". | Score < 0.6: thiếu điều kiện/exception quyết định, ví dụ quên "defective device verified thì miễn restocking fee" hoặc quên "claim warranty cần order number hoặc proof of purchase". Khách có thể bị từ chối quyền lợi. | Thêm answer checklist và few-shot complete answer cho chính sách có điều kiện; tăng context window cho generator; kiểm tra completeness trước khi finalize. |
 
 ### Exercise 1.2 — Bias trong LLM-as-a-Judge
 
@@ -46,29 +46,31 @@ Ba bias thường gặp:
 
 **Câu 1: Thiết kế experiment phát hiện position bias với ít nhất hai conditions.**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Dùng cùng 1 question OrbitTech (ví dụ "Opened NovaBook 14 được trả trong bao lâu, phí bao nhiêu?") và cùng 2 candidate answers A (đúng: 14 ngày + 10% restocking fee, có citation) và B (sai/thiếu: 30 ngày miễn phí). Tạo 2 conditions với nội dung giống hệt, chỉ đổi thứ tự: Condition A/B (A đứng trước, B đứng sau) và Condition B/A (B đứng trước, A đứng sau). Mỗi condition chạy N lần (ví dụ N ≥ 30), randomize thứ tự trình bày, blind label (judge không biết đâu là đáp án đúng), dùng cùng LLM-as-a-Judge prompt và rubric. Đo win-rate của từng answer và consistency rate (tỉ lệ judge chọn cùng answer khi đổi vị trí). Nếu judge đổi lựa chọn theo vị trí (ví dụ luôn chọn answer đứng trước dù nội dung không đổi, chênh lệch win-rate theo position > ngưỡng, consistency thấp) thì kết luận có position bias. Khắc phục: randomize order, chạy cả 2 chiều rồi average, dùng multiple judges.
 
 **Câu 2: Làm thế nào giảm verbosity bias bằng rubric design?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Thiết kế rubric chấm theo evidence và checklist thay vì độ dài: mỗi claim về thời hạn/phí/điều kiện phải có citation từ corpus mới được điểm; claim không có evidence bị trừ điểm dù answer dài. Tách dimension riêng cho Completeness (đủ ý quyết định) và Clarity/Tone (ngắn gọn), đặt trọng số cho Correctness và Evidence cao hơn. Thêm quy tắc penalty explicit: "answer dài nhưng thêm thông tin ngoài corpus hoặc lặp ý không được cộng điểm; answer ngắn đủ ý được điểm cao hơn answer dài lan man". Có thể đặt length guideline và ví dụ response mẫu ngắn-đúng vs dài-sai để calibrate judge.
 
 **Câu 3: Tại sao cần calibrate LLM judge với human labels?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Vì LLM judge có thể lệch hệ thống (leniency bias cho điểm quá cao, severity bias cho điểm quá thấp, self-preference ưu tiên văn phong giống chính nó) và thiếu am hiểu domain OrbitTech (ví dụ nhầm lẫn return window với warranty period). Calibrate bằng cách lấy một tập mẫu có human labels (chuyên gia hỗ trợ khách hàng chấm theo cùng rubric 1–5), so sánh với điểm của judge để đo agreement (ví dụ Cohen's kappa, correlation), từ đó chỉnh rubric/prompt, đặt threshold và phát hiện drift. Human labels là ground truth để xác nhận judge đáng tin trước khi dùng làm quality gate tự động.
 
 ### Exercise 1.3 — Evaluation trong CI/CD
 
 **Câu 1: Chọn threshold để block deployment.**
 
+> Lưu ý: các threshold dưới đây là hypothetical policy thresholds cho CI/CD quality gate (do team tự đặt theo rủi ro nghiệp vụ). Chúng khác với fixed Task 1 code contract trong `template.py` (pass rule `passed = all three scores >= 0.5`, `failure_type` khi `< 0.3`, `overall_score = mean 3 answer metrics`, regression khi drop `> 0.05`): code contract là logic cố định để unit tests kiểm tra, còn policy thresholds là ngưỡng vận hành có thể siết/nới theo từng release.
+
 | Metric | Threshold | Lý do |
 |---|---:|---|
-| Faithfulness | | |
-| Answer Relevance | | |
-| Completeness | | |
+| Faithfulness | Block nếu avg < 0.75 | Hallucination về chính sách (window, phí, bảo hành) gây thiệt hại tài chính và pháp lý trực tiếp nên cần ngưỡng chặn strict nhất. |
+| Answer Relevance | Block nếu avg < 0.70 | Answer lạc intent khiến khách phải hỏi lại, tăng tải hỗ trợ; ngưỡng thấp hơn Faithfulness một chút vì ít rủi ro trực tiếp hơn bịa chính sách. |
+| Completeness | Block nếu avg < 0.70 | Thiếu exception/điều kiện (miễn restocking fee khi defective, proof of purchase) cũng gây từ chối quyền lợi sai; chặn ở mức tương đương Relevance để đảm bảo answer đủ ý quyết định. |
 
 **Câu 2: Khi nào dùng offline evaluation, online evaluation và human review?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Offline evaluation dùng trước khi deploy trên golden dataset cố định 20 QA (stratified sampling Easy/Medium/Hard/Adversarial): reproducible, so sánh được giữa các phiên bản prompt/retriever, làm quality gate chặn release khi metric drop > 0.05. Online evaluation dùng sau khi deploy trên production traffic: theo dõi live metrics, user feedback/thumbs-down, phát hiện drift khi chính sách hoặc hành vi khách thay đổi mà golden dataset chưa cover. Human review dùng cho các case judge không tin cậy: adversarial/prompt-injection, privacy/safety, failure cluster điểm thấp, và định kỳ audit mẫu để calibrate LLM judge với human labels. Quy trình chuẩn: offline gate chặn lỗi lớn → online monitor phát hiện sớm → human review quyết định các case nhạy cảm và bổ sung vào golden dataset (Augment) cho vòng lặp tiếp theo.
 
 ---
 
